@@ -4,19 +4,19 @@ package main
 // но по одной (что бы пользлователь не забывал читать статьи, к примеру, которые он сохранил)
 
 import (
+	"context"
 	tgClient "firstTGBot/clients/telegram"
 	"firstTGBot/consumer/eventConsumer"
 	"firstTGBot/events/telegram"
-	"firstTGBot/storage/files"
+	"firstTGBot/storage/sqlite"
 	"flag"
 	"log"
-	"os"
-	"path/filepath"
 )
 
 const (
-	tgBotHost = "api.telegram.org"
-	batchSize = 100
+	tgBotHost         = "api.telegram.org"
+	batchSize         = 100
+	sqliteStoragePath = "data/sqlite/storage.db"
 )
 
 func main() {
@@ -26,14 +26,25 @@ func main() {
 	с теми или иными сервисами, по этому создадим для них заранее папку clients
 	*/
 
-	ex, err := os.Executable()
+	// ex, err := os.Executable()
+	// if err != nil {
+	// 	panic(err)
+	// }
+
+	bd, err := sqlite.New(sqliteStoragePath)
 	if err != nil {
-		panic(err)
+		log.Fatal("can not connect to storage: ", err)
+	}
+	// если мы используем такой контекст, который не ограничивает какими-либо таймаутами или дедлайнами,
+	// то мы говорим, что сделаем когда-то в будущем контекст с таймаутом или дедлайном (context.WithTimeout(context.Background(), 5 * time.Second()))
+	// background говорит о том, что таймауты и дедлайны вообще не нужны
+	if err := bd.Init(context.TODO()); err != nil {
+		log.Fatal("can not init storage: ", err)
 	}
 
 	eventProcessor := telegram.New(
 		tgClient.New(tgBotHost, mustToken()),
-		files.New(filepath.Dir(ex)+"/files_storage"),
+		bd,
 	)
 
 	log.Print("service started")
